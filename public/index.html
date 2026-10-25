@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodieHub - Simple Food Order</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>FoodieHub</h1>
+    <p>Delicious food, simple ordering.</p>
+  </header>
+
+  <main>
+    <section id="menu">
+      <h2>Menu</h2>
+      <div id="food-list" class="grid"></div>
+    </section>
+
+    <section id="cart-section" class="hidden">
+      <h2>Your Cart</h2>
+      <table id="cart-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Total</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="cart-total">Total: $0.00</p>
+      <button id="checkout-button">Proceed to Checkout</button>
+    </section>
+
+    <section id="checkout-section" class="hidden">
+      <h2>Checkout</h2>
+      <form id="checkout-form">
+        <label>Name: <input type="text" name="name" required /></label><br />
+        <label>Phone: <input type="text" name="phone" required /></label><br />
+        <label>Address: <textarea name="address" required></textarea></label><br />
+        <button type="submit">Place Order</button>
+      </form>
+      <p id="order-message" class="hidden"></p>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

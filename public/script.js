@@ -1,168 +1,101 @@
-// script.js - Handles fetching menu, cart operations and checkout
 
-// Global state
-const foods = [];
-const cart = {};
+let foods = [];
+let cart = {};
 
-// Helper to format price
-function formatPrice(num) {
-  return '$' + num.toFixed(2);
+async function loadFoods() {
+    let res = await fetch("/api/foods");
+    foods = await res.json();
+
+    document.getElementById("food-list").innerHTML = foods.map(f => `
+        <div class="food-item">
+            <img src="${f.image}" alt="${f.name}">
+            <h3>${f.name}</h3>
+            <p>$${Number(f.price).toFixed(2)}</p>
+            <button onclick="add(${f.id})">Add to Cart</button>
+        </div>
+    `).join("");
 }
 
-// Render the food menu
-function renderMenu() {
-  const container = document.getElementById('food-list');
-  container.innerHTML = '';
-  foods.forEach(food => {
-    const div = document.createElement('div');
-    div.className = 'food-item';
-    div.innerHTML = `
-      <img src="${food.image}?v=${Date.now()}" alt="${food.name}" />
-      <h3>${food.name}</h3>
-      <p>${formatPrice(food.price)}</p>
-      <button data-id="${food.id}">Add to Cart</button>
-    `;
-    container.appendChild(div);
-  });
-
-  // Add click listeners for Add to Cart
-  container.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-id');
-      addToCart(parseInt(id, 10));
-    });
-  });
+function add(id) {
+    cart[id] = (cart[id] || 0) + 1;
+    showCart();
 }
 
-function addToCart(id) {
-  if (!cart[id]) {
-    cart[id] = { id, qty: 1 };
-  } else {
-    cart[id].qty += 1;
-  }
-  updateCartUI();
+function remove(id) {
+    if (--cart[id] <= 0) delete cart[id];
+    showCart();
 }
 
-function removeFromCart(id) {
-  delete cart[id];
-  updateCartUI();
+function showCart() {
+    let total = 0, rows = "";
+
+    for (let id in cart) {
+        let f = foods.find(x => x.id == id);
+        if (!f) continue;
+
+        let price = f.price * cart[id];
+        total += price;
+
+        rows += `<tr>
+            <td>${f.name}</td>
+            <td>${cart[id]}</td>
+            <td>$${Number(f.price).toFixed(2)}</td>
+            <td>$${price.toFixed(2)}</td>
+            <td>
+                <button onclick="add(${id})">+</button>
+                <button onclick="remove(${id})">-</button>
+            </td>
+        </tr>`;
+    }
+
+    document.querySelector("#cart-table tbody").innerHTML = rows;
+    document.getElementById("cart-total").textContent = "Total: $" + total.toFixed(2);
+    document.getElementById("cart-section").classList.toggle("hidden", !rows);
 }
 
-function changeQty(id, delta) {
-  if (!cart[id]) return;
-  cart[id].qty += delta;
-  if (cart[id].qty <= 0) {
-    delete cart[id];
-  }
-  updateCartUI();
-}
+document.addEventListener("DOMContentLoaded", () => {
+    loadFoods();
 
-function updateCartUI() {
-  const section = document.getElementById('cart-section');
-  const tbody = document.querySelector('#cart-table tbody');
-  tbody.innerHTML = '';
-  let total = 0;
-  Object.values(cart).forEach(entry => {
-    const food = foods.find(f => f.id === entry.id);
-    const lineTotal = food.price * entry.qty;
-    total += lineTotal;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${food.name}</td>
-      <td>${entry.qty}</td>
-      <td>${formatPrice(food.price)}</td>
-      <td>${formatPrice(lineTotal)}</td>
-      <td>
-        <button class="decrease" data-id="${food.id}">-</button>
-        <button class="increase" data-id="${food.id}">+</button>
-        <button class="remove" data-id="${food.id}">Remove</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-  document.getElementById('cart-total').textContent = `Total: ${formatPrice(total)}`;
+    document.getElementById("checkout-button").onclick = () => {
+        if (!Object.keys(cart).length) return alert("Your cart is empty");
+        document.getElementById("checkout-section").classList.remove("hidden");
+        document.getElementById("cart-section").classList.add("hidden");
+    };
 
-  // Show or hide cart section
-  if (Object.keys(cart).length > 0) {
-    section.classList.remove('hidden');
-  } else {
-    section.classList.add('hidden');
-  }
+    document.getElementById("checkout-form").onsubmit = async function(e) {
+        e.preventDefault();
 
-  // Attach button listeners
-  tbody.querySelectorAll('.increase').forEach(btn => {
-    btn.addEventListener('click', () => changeQty(parseInt(btn.dataset.id, 10), 1));
-  });
-  tbody.querySelectorAll('.decrease').forEach(btn => {
-    btn.addEventListener('click', () => changeQty(parseInt(btn.dataset.id, 10), -1));
-  });
-  tbody.querySelectorAll('.remove').forEach(btn => {
-    btn.addEventListener('click', () => removeFromCart(parseInt(btn.dataset.id, 10)));
-  });
-}
+        let customer = {
+            name: this.name.value.trim(),
+            phone: this.phone.value.trim(),
+            address: this.address.value.trim()
+        };
 
-// Checkout flow
-function showCheckout() {
-  document.getElementById('checkout-section').classList.remove('hidden');
-  document.getElementById('cart-section').classList.add('hidden');
-}
+        if (!customer.name || !customer.phone || !customer.address)
+            return alert("Fill in all fields");
 
-function placeOrder(event) {
-  event.preventDefault();
-  const form = event.target;
-  const customer = {
-    name: form.name.value.trim(),
-    phone: form.phone.value.trim(),
-    address: form.address.value.trim()
-  };
-  // Basic validation
-  if (!customer.name || !customer.phone || !customer.address) {
-    alert('Please fill in all fields');
-    return;
-  }
-  const items = Object.values(cart).map(entry => ({
-    id: entry.id,
-    qty: entry.qty
-  }));
-  fetch('/api/orders', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ customer, items })
-  })
-    .then(res => res.json())
-    .then(data => {
-      const msg = document.getElementById('order-message');
-      if (data.success) {
-        msg.textContent = 'Order placed! Your order ID is ' + data.orderId;
-        msg.classList.remove('hidden');
-        // Clear cart & form
-        Object.keys(cart).forEach(k => delete cart[k]);
-        updateCartUI();
-        form.reset();
-      } else {
-        msg.textContent = 'Error: ' + (data.message || 'Failed to place order');
-        msg.style.color = 'red';
-        msg.classList.remove('hidden');
-      }
-    })
-    .catch(err => {
-      alert('Network error');
-      console.error(err);
-    });
-}
+        let items = Object.keys(cart).map(id => ({id: Number(id), qty: cart[id]}));
 
-// Initial loading
-function init() {
-  fetch('/api/foods')
-    .then(res => res.json())
-    .then(data => {
-      foods.push(...data);
-      renderMenu();
-    })
-    .catch(err => console.error('Failed to load foods', err));
+        try {
+            let res = await fetch("/api/orders", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({customer, items})
+            });
 
-  document.getElementById('checkout-button').addEventListener('click', showCheckout);
-  document.getElementById('checkout-form').addEventListener('submit', placeOrder);
-}
+            let data = await res.json();
+            document.getElementById("order-message").textContent =
+                data.success ? "Order placed! ID: " + data.orderId : "Order failed";
+            document.getElementById("order-message").classList.remove("hidden");
 
-window.addEventListener('DOMContentLoaded', init);
+            if (data.success) {
+                cart = {};
+                showCart();
+                this.reset();
+                document.getElementById("checkout-section").classList.add("hidden");
+            }
+        } catch {
+            alert("Could not place order. Try again.");
+        }
+    };
+});
